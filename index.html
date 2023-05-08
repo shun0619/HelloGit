@@ -1,0 +1,88 @@
+<?php
+$host = 'localhost';
+$username = 'root';
+$password = 'password';
+$dbname = 'quiz_db';
+
+// データベースに接続する
+$conn = mysqli_connect($host, $username, $password, $dbname);
+mysqli_set_charset($conn, 'utf8');
+if (!$conn) {
+    die('データベースに接続できません：' . mysqli_error($conn));
+}
+session_start(); // セッションを開始する
+
+// 正解の数を保持する変数を初期化する
+if (!isset($_SESSION['correct_count'])) {
+    $_SESSION['correct_count'] = 0;
+}
+
+// ランダムに１問取得する
+$sql = "SELECT * FROM quiz_question ORDER BY RAND() LIMIT 1";
+$result = mysqli_query($conn, $sql);
+
+// 取得した問題と選択肢を表示する
+$question = mysqli_fetch_assoc($result);
+$question_id = $question['question_id'];
+$question_text = $question['question_text'];
+
+echo '<form method="post">';
+echo '<p>' . $question_text . '</p>';
+
+$sql = "SELECT * FROM quiz_answer WHERE question_id = $question_id ORDER BY RAND()";
+$result = mysqli_query($conn, $sql);
+
+while ($row = mysqli_fetch_assoc($result)) {
+    $choice_id = $row['answer_id'];
+    $choice_text = $row['user_option'];
+    echo '<input type="radio" name="answer" value="' . $choice_id . '"> ' . $choice_text . '<br>';
+}
+
+echo '<input type="submit" value="回答する">';
+echo '</form>';
+
+// 回答が送信された場合、正誤を判定して結果を表示する
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $answer_id = $_POST['answer'];
+    $sql = "SELECT * FROM quiz_answer WHERE answer_id = $answer_id";
+    $result = mysqli_query($conn, $sql);
+    $row = mysqli_fetch_assoc($result);
+   
+    if ($row['is_correct'] == 1) {
+      // 正解数をインクリメントする
+     $_SESSION['correct_count']++;
+     echo '<button id="next-btn" style="display: none;" onclick="showNext()">次へ</button>';
+
+     echo '<script>
+     function showNext() {
+         document.getElementById("next-btn").style.display = "none";
+         location.reload(); // ページをリロードして次の問題を表示する
+     }
+     </script>';
+     
+       if ($_SESSION['correct_count'] === 1){ 
+         echo '<script>
+             document.getElementById("next-btn").style.display = "inline";
+             alert("正解!\\n残り2問です!");
+         </script>';
+       } else if($_SESSION['correct_count'] === 2){ 
+         echo '<script>
+             document.getElementById("next-btn").style.display = "inline";
+             alert("正解!\\n残り1問です!");
+         </script>';
+       } else if ($_SESSION['correct_count'] === 3) {
+         echo "<script>alert('3問連続正解です!');</script>";
+         // 正解数をリセットする
+         $_SESSION['correct_count'] = 0;
+       }
+ } else {
+     // 不正解の場合は、正解数をリセットする
+     $_SESSION['correct_count'] = 0;
+     echo "<script>alert('不正解…');</script>";  
+ }     
+}
+
+
+// データベースとの接続を閉じる
+mysqli_close($conn);
+?>
